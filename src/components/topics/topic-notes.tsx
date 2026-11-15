@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { saveNote } from "@/app/(app)/topicos/actions";
 import { formatEditedAt } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Markdown } from "./markdown";
+import { NoteEditor } from "./note-editor/note-editor";
 
 type Props = { topicId: string; initialContent: string; initialUpdatedAt: string | null };
 
@@ -14,7 +14,10 @@ const DEBOUNCE_MS = 800;
 
 export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props) {
   const [content, setContent] = useState(initialContent);
-  const [mode, setMode] = useState<"editar" | "visualizar">(initialContent.trim() ? "visualizar" : "editar");
+  // Visual: editor estilo Notion. Markdown: texto cru, para quem prefere.
+  const [mode, setMode] = useState<"visual" | "markdown">("visual");
+  // Muda ao voltar do modo Markdown para o editor visual recarregar o texto.
+  const [editorKey, setEditorKey] = useState(0);
   const [state, setState] = useState<SaveState>("idle");
   const [updatedAt, setUpdatedAt] = useState(initialUpdatedAt);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +90,7 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
             : "Sem notas ainda";
 
   return (
-    <section className="min-w-0 flex-[3_1_480px] overflow-hidden rounded-lg border border-line">
+    <section className="min-w-0 flex-[3_1_480px] rounded-lg border border-line transition-colors focus-within:border-line-hover">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
         <h2 className="font-medium">Notas</h2>
         <div className="flex items-center gap-3">
@@ -97,8 +100,8 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
           <div role="group" aria-label="Modo das notas" className="flex gap-1 rounded-md border border-line p-0.5">
             {(
               [
-                ["editar", "Editar"],
-                ["visualizar", "Visualizar"],
+                ["visual", "Visual"],
+                ["markdown", "Markdown"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -106,7 +109,9 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
                 type="button"
                 aria-pressed={mode === value}
                 onClick={() => {
-                  if (value === "visualizar") void flush();
+                  if (value === mode) return;
+                  void flush();
+                  if (value === "visual") setEditorKey((k) => k + 1);
                   setMode(value);
                 }}
                 className={cn(
@@ -130,7 +135,22 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
         </p>
       )}
 
-      {mode === "editar" ? (
+      {mode === "visual" ? (
+        <div className="px-7 pt-5 pb-8">
+          <div className="max-w-[720px]">
+            <NoteEditor
+              key={editorKey}
+              initialMarkdown={content}
+              onChange={onChange}
+              onBlur={() => void flush()}
+            />
+          </div>
+          <p className="mt-4 text-xs text-fg-muted">
+            Digite <kbd className="rounded-[4px] border border-line px-1 font-mono text-[11px]">/</kbd> para
+            inserir blocos. Atalhos de markdown funcionam enquanto você escreve. Salva sozinho.
+          </p>
+        </div>
+      ) : (
         <div className="p-5">
           <label htmlFor="topic-note" className="sr-only">
             Notas do tópico em markdown
@@ -140,26 +160,10 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
             value={content}
             onChange={(e) => onChange(e.target.value)}
             onBlur={() => void flush()}
-            placeholder={"## Resumo\n\nEscreva em markdown: títulos, listas, `código` e blocos com ```"}
             spellCheck
-            className="block min-h-[420px] w-full resize-y rounded-md border border-line bg-black px-4 py-3 font-sans text-sm leading-[1.7] text-fg placeholder:text-fg-muted"
+            className="block min-h-[420px] w-full resize-y rounded-md border border-line bg-black px-4 py-3 font-mono text-[13px] leading-[1.7] text-fg placeholder:text-fg-muted"
           />
           <p className="mt-2 text-xs text-fg-muted">Markdown com GFM. Salva sozinho enquanto você escreve.</p>
-        </div>
-      ) : content.trim() ? (
-        <div className="max-w-[720px] px-7 pt-6 pb-8">
-          <Markdown content={content} />
-        </div>
-      ) : (
-        <div className="px-7 py-10 text-center">
-          <p className="text-fg-muted">Nenhuma nota ainda.</p>
-          <button
-            type="button"
-            onClick={() => setMode("editar")}
-            className="mt-2 cursor-pointer text-[13px] text-fg underline underline-offset-4"
-          >
-            Começar a escrever
-          </button>
         </div>
       )}
     </section>
