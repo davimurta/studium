@@ -108,3 +108,36 @@ export const getTopic = cache(async (userId: string, id: string) => {
     },
   });
 });
+
+// Notas, recursos, tempo total e sessoes recentes da pagina do topico.
+export async function getTopicExtras(userId: string, topicId: string) {
+  const [note, resources, totals, recentSessions] = await Promise.all([
+    db.note.findFirst({
+      where: { topicId, topic: { userId } },
+      select: { content: true, updatedAt: true },
+    }),
+    db.resource.findMany({
+      where: { topicId, topic: { userId } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, title: true, url: true },
+    }),
+    db.studyLog.aggregate({
+      where: { userId, topicId },
+      _sum: { minutes: true },
+      _count: { _all: true },
+    }),
+    db.studyLog.findMany({
+      where: { userId, topicId },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 5,
+      select: { id: true, date: true, minutes: true },
+    }),
+  ]);
+  return {
+    note,
+    resources,
+    totalMinutes: totals._sum.minutes ?? 0,
+    sessionCount: totals._count._all,
+    recentSessions,
+  };
+}
