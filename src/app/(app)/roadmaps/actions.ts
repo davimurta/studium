@@ -9,6 +9,7 @@ import {
   newItemSchema,
   reorderSchema,
   roadmapFormSchema,
+  structureSchema,
 } from "@/lib/validation/roadmap";
 import { statusSchema } from "@/lib/validation/topic";
 
@@ -257,6 +258,66 @@ export async function reorderItems(
 
   await db.$transaction([
     ...changed.map(({ id, position }) => db.roadmapItem.update({ where: { id }, data: { position } })),
+    db.roadmap.update({ where: { id: roadmapId }, data: { updatedAt: new Date() } }),
+  ]);
+  refresh();
+  return {};
+}
+
+// Salva ordem e hierarquia de uma vez a partir da lista "achatada" (como aparece na Lista).
+// Cada entrada tem depth 0 (etapa principal) ou 1 (subetapa da etapa principal anterior).
+export async function saveStructure(
+  roadmapId: string,
+  entries: { id: string; depth: number }[],
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const parsed = structureSchema.safeParse(entries);
+  if (!parsed.success) return { error: "Estrutura inválida." };
+  const list = parsed.data;
+
+  const roadmap = await db.roadmap.findFirst({
+    where: { id: roadmapId, userId },
+    select: { items: { select: { id: true, parentId: true, position: true } } },
+  });
+  if (!roadmap) return { error: "Roadmap não encontrado." };
+
+  const current = new Map(roadmap.items.map((i) => [i.id, i]));
+  if (
+    list.length !== current.size ||
+    new Set(list.map((e) => e.id)).size !== list.length ||
+    list.some((e) => !current.has(e.id))
+  ) {
+    return { error: "A lista de etapas mudou. Recarregue a página." };
+  }
+  if (list.length > 0 && list[0].depth !== 0) return { error: "A primeira etapa precisa ser principal." };
+
+  // Deriva parentId e position de cada item.
+  const next: { id: string; parentId: string | null; position: number }[] = [];
+  let lastMain: string | null = null;
+  let mainPos = 0;
+  let childPos = 0;
+  for (const e of list) {
+    if (e.depth === 0) {
+      lastMain = e.id;
+      childPos = 0;
+      next.push({ id: e.id, parentId: null, position: mainPos++ });
+    } else {
+      next.push({ id: e.id, parentId: lastMain, position: childPos++ });
+    }
+  }
+
+  const changed = next.filter((n) => {
+    const c = current.get(n.id)!;
+    return c.parentId !== n.parentId || c.position !== n.position;
+  });
+
+  // Primeiro promove quem vira principal (evita apontar para pai que deixara de ser principal),
+  // depois grava o restante.
+  const ordered = [...changed.filter((n) => n.parentId === null), ...changed.filter((n) => n.parentId !== null)];
+  await db.$transaction([
+    ...ordered.map((n) =>
+      db.roadmapItem.update({ where: { id: n.id }, data: { parentId: n.parentId, position: n.position } }),
+    ),
     db.roadmap.update({ where: { id: roadmapId }, data: { updatedAt: new Date() } }),
   ]);
   refresh();

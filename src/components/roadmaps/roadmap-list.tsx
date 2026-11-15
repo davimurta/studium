@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -11,11 +11,12 @@ import {
   useSensors,
   type Announcements,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
-import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
-  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -26,82 +27,93 @@ import { GripVerticalIcon } from "@/components/icons/grip-vertical";
 import { useAnimatedIcon } from "@/components/icons/use-animated-icon";
 import { StatusDot } from "@/components/status-dot";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { RoadmapItemRow, RoadmapStep } from "@/lib/data/roadmaps";
+import {
+  applyMove,
+  childIdsOf,
+  flatten,
+  labels as buildLabels,
+  projectDepth,
+  type FlatItem,
+} from "@/lib/roadmap-tree";
 import { STATUS_LABEL } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { useRoadmapEditor } from "./roadmap-editor";
 import { StepMenuContent } from "./step-menu";
 
-const GRID =
-  "grid grid-cols-[16px_40px_16px_minmax(0,1fr)_220px_110px_28px] items-center gap-3.5";
+// Quantos px para o lado equivalem a um nivel de recuo (arrastar para a direita = subetapa).
+const INDENT = 32;
 
-// Ordem local otimista por grupo de irmaos ("root" = etapas principais).
-type Orders = Record<string, string[]>;
-
-function ordersFrom(steps: RoadmapStep[]): Orders {
-  const orders: Orders = { root: steps.map((s) => s.id) };
-  for (const s of steps) orders[s.id] = s.children.map((c) => c.id);
-  return orders;
-}
+const GRID = "grid grid-cols-[16px_44px_16px_minmax(0,1fr)_220px_110px_28px] items-center gap-3.5";
 
 export function RoadmapList() {
   const editor = useRoadmapEditor();
   const { steps } = editor;
-  const [orders, setOrders] = useState(() => ordersFrom(steps));
-  const [synced, setSynced] = useState(steps);
+  // Id estavel evita divergencia de hidratacao nos atributos aria do dnd-kit.
+  const dndId = useId();
 
-  // Lista nova do servidor passa a valer.
+  const [flat, setFlat] = useState<FlatItem[]>(() => flatten(steps));
+  const [synced, setSynced] = useState(steps);
   if (steps !== synced) {
+    // Lista nova do servidor passa a valer.
     setSynced(steps);
-    setOrders(ordersFrom(steps));
+    setFlat(flatten(steps));
   }
 
-  const byId = useMemo(() => {
-    const map = new Map<string, RoadmapItemRow & { children?: RoadmapItemRow[] }>();
-    for (const s of steps) {
-      map.set(s.id, s);
-      for (const c of s.children) map.set(c.id, c);
-    }
-    return map;
-  }, [steps]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [offsetX, setOffsetX] = useState(0);
 
-  const groupOf = (id: string) => {
-    const item = byId.get(id);
-    return item?.parentId ?? "root";
-  };
+  const activeChildren = useMemo(() => (activeId ? childIdsOf(flat, activeId) : []), [flat, activeId]);
+  // Durante o arraste, as subetapas do item ativo "vao junto" e saem da lista visivel.
+  const visible = useMemo(
+    () => (activeChildren.length ? flat.filter((f) => !activeChildren.includes(f.id)) : flat),
+    [flat, activeChildren],
+  );
+  const projected =
+    activeId && overId ? projectDepth(visible, activeId, overId, offsetX, INDENT, activeChildren.length > 0) : null;
+  const rowLabels = useMemo(() => buildLabels(flat), [flat]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  async function onDragEnd({ active, over }: DragEndEvent) {
-    if (!over || active.id === over.id) return;
-    const group = groupOf(String(active.id));
-    if (group !== groupOf(String(over.id))) return; // so reordena entre irmaos
-    const current = orders[group];
-    const next = arrayMove(current, current.indexOf(String(active.id)), current.indexOf(String(over.id)));
-    setOrders((o) => ({ ...o, [group]: next }));
-    const ok = await editor.reorder(group === "root" ? null : group, next);
-    if (!ok) setOrders((o) => ({ ...o, [group]: current }));
+  function reset() {
+    setActiveId(null);
+    setOverId(null);
+    setOffsetX(0);
   }
 
-  const titleOf = (id: string | number) => byId.get(String(id))?.title ?? "etapa";
-  const posOf = (id: string | number) => (orders[groupOf(String(id))] ?? []).indexOf(String(id)) + 1;
+  async function onDragEnd({ active, over }: DragEndEvent) {
+    const id = String(active.id);
+    const target = over ? String(over.id) : null;
+    const depth = projected;
+    reset();
+    if (!target || depth === null) return;
+
+    const next = applyMove(flat, id, target, depth);
+    const unchanged = next.every((f, i) => f.id === flat[i].id && f.depth === flat[i].depth);
+    if (unchanged) return;
+
+    const previous = flat;
+    setFlat(next);
+    const ok = await editor.save(next);
+    if (!ok) setFlat(previous);
+  }
+
+  const titleOf = (id: string | number) => flat.find((f) => f.id === String(id))?.item.title ?? "etapa";
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Etapa "${titleOf(active.id)}" selecionada, posição ${posOf(active.id)}.`,
+    onDragStart: ({ active }) => `Etapa "${titleOf(active.id)}" selecionada.`,
     onDragOver: ({ active, over }) =>
-      over ? `Etapa "${titleOf(active.id)}" sobre a posição ${posOf(over.id)}.` : undefined,
+      over ? `Etapa "${titleOf(active.id)}" sobre "${titleOf(over.id)}".` : undefined,
     onDragEnd: ({ active, over }) =>
-      over ? `Etapa "${titleOf(active.id)}" movida para a posição ${posOf(over.id)}.` : undefined,
+      over ? `Etapa "${titleOf(active.id)}" solta perto de "${titleOf(over.id)}".` : undefined,
     onDragCancel: ({ active }) => `Movimento cancelado. Etapa "${titleOf(active.id)}" voltou ao lugar.`,
   };
 
-  const mainSteps = orders.root.map((id) => byId.get(id)).filter(Boolean) as RoadmapStep[];
-
   return (
     <section className="overflow-x-auto rounded-lg border border-line">
-      <div className="min-w-[820px]">
+      <div className="min-w-[840px]">
         <div aria-hidden="true" className={`${GRID} px-4 py-2.5 text-xs text-fg-muted`}>
           <span />
           <span>Etapa</span>
@@ -112,71 +124,88 @@ export function RoadmapList() {
           <span />
         </div>
         <DndContext
+          id={dndId}
           sensors={sensors}
           collisionDetection={closestCenter}
-          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          onDragStart={({ active }: DragStartEvent) => {
+            setActiveId(String(active.id));
+            setOverId(String(active.id));
+          }}
+          onDragMove={({ delta }: DragMoveEvent) => setOffsetX(delta.x)}
+          onDragOver={({ over }: DragOverEvent) => setOverId(over ? String(over.id) : null)}
           onDragEnd={onDragEnd}
+          onDragCancel={reset}
           accessibility={{
             announcements,
             screenReaderInstructions: {
               draggable:
-                "Para mover a etapa, pressione espaço. Use as setas para cima e para baixo e pressione espaço de novo para soltar, ou Esc para cancelar. Subetapas se movem dentro da etapa principal.",
+                "Para mover a etapa, pressione espaço, use as setas para cima e para baixo e pressione espaço de novo para soltar. Para transformar em subetapa, use o menu de ações da etapa.",
             },
           }}
         >
-          <SortableContext items={orders.root} strategy={verticalListSortingStrategy}>
+          <SortableContext items={visible.map((f) => f.id)} strategy={verticalListSortingStrategy}>
             <ol aria-label="Etapas do roadmap">
-              {mainSteps.map((step, index) => {
-                const childIds = orders[step.id] ?? [];
-                const children = childIds.map((id) => byId.get(id)).filter(Boolean) as RoadmapItemRow[];
+              {visible.map((f) => {
+                const isActive = f.id === activeId;
+                const depth = isActive && projected !== null ? projected : f.depth;
                 return (
-                  <SortableRow key={step.id} item={step} label={String(index + 1).padStart(2, "0")} childCount={children.length}>
-                    {children.length > 0 && (
-                      <SortableContext items={childIds} strategy={verticalListSortingStrategy}>
-                        <ol aria-label={`Subetapas de ${step.title}`}>
-                          {children.map((child, ci) => (
-                            <SortableRow
-                              key={child.id}
-                              item={child}
-                              label={`${String(index + 1).padStart(2, "0")}.${ci + 1}`}
-                              nested
-                            />
-                          ))}
-                        </ol>
-                      </SortableContext>
-                    )}
-                  </SortableRow>
+                  <TreeRow
+                    key={f.id}
+                    flatItem={f}
+                    depth={depth}
+                    label={rowLabels.get(f.id) ?? ""}
+                    childCount={f.depth === 0 ? childIdsOf(flat, f.id).length : 0}
+                    hiddenChildren={isActive ? activeChildren.length : 0}
+                  />
                 );
               })}
             </ol>
           </SortableContext>
         </DndContext>
       </div>
+      <p className="border-t border-line px-4 py-2.5 text-xs text-fg-muted">
+        Arraste para cima e para baixo para reordenar. Arraste um pouco para a direita para transformar em
+        subetapa da etapa de cima, e para a esquerda para voltar a ser etapa principal.
+      </p>
     </section>
   );
 }
 
 type RowProps = {
-  item: RoadmapItemRow;
+  flatItem: FlatItem;
+  depth: 0 | 1;
   label: string;
-  nested?: boolean;
-  childCount?: number;
-  children?: React.ReactNode;
+  childCount: number;
+  hiddenChildren: number;
 };
 
-function SortableRow({ item, label, nested = false, childCount = 0, children }: RowProps) {
+function TreeRow({ flatItem, depth, label, childCount, hiddenChildren }: RowProps) {
+  const { item } = flatItem;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
   const { ref: gripRef, triggerProps: gripTrigger } = useAnimatedIcon();
   const status = item.effectiveStatus;
+  const nested = depth === 1;
 
   return (
     <li
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("relative bg-black", isDragging && "z-10 outline outline-1 outline-line-hover")}
+      // So deslocamento vertical; o recuo horizontal vem da profundidade projetada.
+      style={{ transform: CSS.Translate.toString(transform ? { ...transform, x: 0 } : null), transition }}
+      className={cn("relative border-t border-line bg-black", isDragging && "z-10")}
     >
-      <div className={cn(GRID, "border-t border-line px-4 py-[13px] hover:bg-surface", isDragging && "bg-active")}>
+      {nested && (
+        // Guia vertical ligando a subetapa a etapa principal
+        <span aria-hidden="true" className="absolute top-0 bottom-0 left-[28px] w-px bg-[#404040]" />
+      )}
+      <div
+        className={cn(
+          GRID,
+          "py-[13px] pr-4 transition-[padding] duration-150 hover:bg-surface",
+          isDragging && "bg-active outline outline-1 outline-line-hover",
+        )}
+        style={{ paddingLeft: 16 + depth * INDENT }}
+      >
         <button
           ref={setActivatorNodeRef}
           type="button"
@@ -192,13 +221,17 @@ function SortableRow({ item, label, nested = false, childCount = 0, children }: 
         <StatusDot status={status} />
         <span
           className={cn(
-            "flex min-w-0 items-center gap-2 font-medium",
+            "flex min-w-0 items-center gap-2",
+            nested ? "font-normal" : "font-medium",
             status === "NOT_STARTED" ? "text-fg-muted" : "text-fg",
-            nested && "pl-5 font-normal",
           )}
         >
-          {nested && <span aria-hidden="true" className="absolute ml-[-20px] h-px w-3 bg-[#404040]" />}
           <span className="truncate">{item.title}</span>
+          {hiddenChildren > 0 && (
+            <span className="shrink-0 rounded-full border border-line px-2 text-xs text-fg-muted">
+              +{hiddenChildren}
+            </span>
+          )}
         </span>
         <span className="min-w-0">
           {item.topic ? (
@@ -223,7 +256,6 @@ function SortableRow({ item, label, nested = false, childCount = 0, children }: 
           <StepMenuContent item={item} childCount={childCount} align="end" />
         </DropdownMenu>
       </div>
-      {children}
     </li>
   );
 }

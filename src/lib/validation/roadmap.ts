@@ -42,3 +42,7 @@ export const editItemSchema = z.object({
 });
 
 export const reorderSchema = z.array(z.string().min(1)).max(500);
+
+export const structureSchema = z
+  .array(z.object({ id: z.string().min(1), depth: z.union([z.literal(0), z.literal(1)]) }))
+  .max(500);

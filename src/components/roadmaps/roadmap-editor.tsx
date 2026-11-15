@@ -2,7 +2,7 @@
 
 import { createContext, use, useCallback, useMemo, useState, useTransition, type ReactNode } from "react";
 import type { Status } from "@/generated/prisma/enums";
-import { removeItem, reorderItems, setItemStatus } from "@/app/(app)/roadmaps/actions";
+import { removeItem, reorderItems, saveStructure, setItemStatus } from "@/app/(app)/roadmaps/actions";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { RoadmapItemRow, RoadmapStep, TopicOption } from "@/lib/data/roadmaps";
+import { flatten, indent, outdent, type FlatItem } from "@/lib/roadmap-tree";
 import { ItemDialog } from "./item-dialog";
 
 type DialogState =
@@ -33,6 +34,10 @@ type Editor = {
   remove: (item: RoadmapItemRow) => void;
   move: (item: RoadmapItemRow, delta: -1 | 1) => void;
   reorder: (parentId: string | null, ids: string[]) => Promise<boolean>;
+  save: (flat: FlatItem[]) => Promise<boolean>;
+  canIndent: (item: RoadmapItemRow) => boolean;
+  indent: (item: RoadmapItemRow) => void;
+  outdent: (item: RoadmapItemRow) => void;
   siblingsOf: (item: RoadmapItemRow) => RoadmapItemRow[];
 };
 
@@ -82,6 +87,19 @@ export function RoadmapEditorProvider({ roadmapId, steps, topics, children }: Pr
     [roadmapId],
   );
 
+  const save = useCallback(
+    async (flat: FlatItem[]) => {
+      setError(null);
+      const result = await saveStructure(
+        roadmapId,
+        flat.map((f) => ({ id: f.id, depth: f.depth })),
+      );
+      if (result.error) setError(result.error);
+      return !result.error;
+    },
+    [roadmapId],
+  );
+
   const editor = useMemo<Editor>(
     () => ({
       roadmapId,
@@ -91,6 +109,16 @@ export function RoadmapEditorProvider({ roadmapId, steps, topics, children }: Pr
       error,
       siblingsOf,
       reorder,
+      save,
+      canIndent: (item) => indent(flatten(steps), item.id) !== null,
+      indent: (item) => {
+        const next = indent(flatten(steps), item.id);
+        if (next) run(async () => ({ error: (await save(next)) ? undefined : "Não foi possível mover." }));
+      },
+      outdent: (item) => {
+        const next = outdent(flatten(steps), item.id);
+        if (next) run(async () => ({ error: (await save(next)) ? undefined : "Não foi possível mover." }));
+      },
       openAdd: (parentId) => setDialog({ kind: "add", parentId }),
       openEdit: (item) => setDialog({ kind: "edit", item }),
       setStatus: (item, status) => run(() => setItemStatus(item.id, status)),
@@ -112,7 +140,7 @@ export function RoadmapEditorProvider({ roadmapId, steps, topics, children }: Pr
         });
       },
     }),
-    [roadmapId, steps, topics, pending, error, siblingsOf, reorder, run],
+    [roadmapId, steps, topics, pending, error, siblingsOf, reorder, save, run],
   );
 
   const editing = dialog.kind === "edit" ? dialog.item : undefined;

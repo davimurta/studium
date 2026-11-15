@@ -59,6 +59,13 @@ export function StepMenuContent({ item, childCount = 0, align = "center" }: Prop
       >
         {isMain ? "Mover para baixo" : "Descer"}
       </DropdownMenuItem>
+      {isMain ? (
+        <DropdownMenuItem disabled={!editor.canIndent(item)} onSelect={() => editor.indent(item)}>
+          Recuar para a etapa acima
+        </DropdownMenuItem>
+      ) : (
+        <DropdownMenuItem onSelect={() => editor.outdent(item)}>Tornar etapa principal</DropdownMenuItem>
+      )}
       <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={() => editor.remove(item)}>
         {childCount > 0 ? `Remover com ${childCount} ${childCount === 1 ? "subetapa" : "subetapas"}` : "Remover"}
