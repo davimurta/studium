@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<title>Roadmaps</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<!-- @font-face do Inter e JetBrains Mono omitidos (usar next/font) -->
+<style>
+body{margin:0;background:#000}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.nav:hover{background:#111}
+.row:hover{background:#0d0d0d}
+.card:hover{border-color:#737373}
+.btn1:hover{background:#d4d4d4}
+.btn2:hover{background:#171717}
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;min-height:800px;background:#000;color:#fff;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+<aside style="flex:0 0 240px;box-sizing:border-box;padding:20px 12px;border-right:1px solid #262626;display:flex;flex-direction:column;gap:24px">
+<a href="Main.dc.html" style="display:flex;align-items:center;gap:10px;padding:4px 10px;font-weight:600;font-size:15px;letter-spacing:-0.01em">
+<span style="display:block;width:16px;height:16px;border:1.5px solid #fff;border-radius:4px"></span>Estudos
+</a>
+<button class="btn2" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer"><span>Buscar</span><span style="font-size:11px;border:1px solid #262626;border-radius:4px;padding:0 6px">Ctrl K</span></button>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<a class="nav" href="Main.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;color:#a3a3a3"><span>Dashboard</span></a>
+<a class="nav" href="Topicos.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;color:#a3a3a3"><span>Tópicos</span><span style="font-size:12px">24</span></a>
+<a class="nav" href="Roadmaps.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;background:#171717;color:#fff;font-weight:500"><span>Roadmaps</span><span style="font-size:12px;color:#a3a3a3">4</span></a>
+</nav>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="padding:0 10px 6px;font-size:12px;color:#a3a3a3">Recentes</div>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Front-end avançado</a>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Ciência da Computação</a>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Mobile com Flutter</a>
+</div>
+</aside>
+
+<main style="flex:999 1 560px;min-width:0;box-sizing:border-box;padding:32px 40px;display:flex;flex-direction:column;gap:24px">
+
+<header style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px">
+<div>
+<div style="font-size:13px;color:#a3a3a3">4 roadmaps</div>
+<h1 style="margin:4px 0 0;font-size:30px;font-weight:600;letter-spacing:-0.02em">Roadmaps</h1>
+</div>
+<button class="btn1" style="padding:9px 16px;border:1px solid #fff;border-radius:6px;background:#fff;color:#000;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Novo roadmap</button>
+</header>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+<sc-for list="{{roadmaps}}" as="r" hint-placeholder-count="4">
+<a class="card" href="Roadmap.dc.html" style="display:flex;flex-direction:column;gap:16px;box-sizing:border-box;padding:20px;border:1px solid #262626;border-radius:8px;min-height:200px">
+<div>
+<div style="font-size:17px;font-weight:600;letter-spacing:-0.01em">{{r.title}}</div>
+<div style="margin-top:6px;color:#a3a3a3">{{r.desc}}</div>
+</div>
+<div style="margin-top:auto">
+<div style="display:flex;justify-content:space-between;font-size:13px;color:#a3a3a3;margin-bottom:8px"><span>{{r.steps}}</span><span>{{r.pct}}</span></div>
+<div style="height:2px;background:#262626"><div style="{{r.bar}}"></div></div>
+<div style="margin-top:14px;font-size:12px;color:#a3a3a3">Atualizado {{r.when}}</div>
+</div>
+</a>
+</sc-for>
+<button class="card" style="display:flex;align-items:center;justify-content:center;min-height:200px;box-sizing:border-box;padding:20px;border:1px dashed #404040;border-radius:8px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:14px;cursor:pointer">Criar novo roadmap</button>
+</section>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:800}}">
+class Component extends DCLogic {
+  renderVals() {
+    const bar = (p) => 'height:2px;background:#fff;width:' + p;
+    const roadmaps = [
+      { title: 'Front-end avançado', desc: 'Da base moderna de HTML e CSS até performance, design systems e deploy.', steps: '7 de 12 etapas', pct: '58%', bar: bar('58%'), when: 'hoje' },
+      { title: 'Ciência da Computação', desc: 'Estruturas de dados, algoritmos, bancos de dados e redes ao longo do curso.', steps: '4 de 15 etapas', pct: '27%', bar: bar('27%'), when: 'há 2 dias' },
+      { title: 'Mobile com Flutter', desc: 'Widgets, navegação, estado e publicação do primeiro app.', steps: '1 de 10 etapas', pct: '10%', bar: bar('10%'), when: 'há 1 semana' },
+      { title: 'Inglês para desenvolvedores', desc: 'Leitura de documentação, escrita técnica e reuniões em inglês.', steps: '3 de 8 etapas', pct: '38%', bar: bar('38%'), when: 'há 2 semanas' }
+    ];
+    return { roadmaps };
+  }
+}
+</script>
+
+
+</body></html>

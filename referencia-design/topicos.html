@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<title>Tópicos</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<!-- @font-face do Inter e JetBrains Mono omitidos (usar next/font) -->
+<style>
+body{margin:0;background:#000}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.nav:hover{background:#111}
+.row:hover{background:#0d0d0d}
+.card:hover{border-color:#525252}
+.btn1:hover{background:#d4d4d4}
+.btn2:hover{background:#171717}
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;min-height:900px;background:#000;color:#fff;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+<aside style="flex:0 0 240px;box-sizing:border-box;padding:20px 12px;border-right:1px solid #262626;display:flex;flex-direction:column;gap:24px">
+<a href="Main.dc.html" style="display:flex;align-items:center;gap:10px;padding:4px 10px;font-weight:600;font-size:15px;letter-spacing:-0.01em">
+<span style="display:block;width:16px;height:16px;border:1.5px solid #fff;border-radius:4px"></span>Estudos
+</a>
+<button class="btn2" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer"><span>Buscar</span><span style="font-size:11px;border:1px solid #262626;border-radius:4px;padding:0 6px">Ctrl K</span></button>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<a class="nav" href="Main.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;color:#a3a3a3"><span>Dashboard</span></a>
+<a class="nav" href="Topicos.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;background:#171717;color:#fff;font-weight:500"><span>Tópicos</span><span style="font-size:12px;color:#a3a3a3">24</span></a>
+<a class="nav" href="Roadmaps.dc.html" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;color:#a3a3a3"><span>Roadmaps</span><span style="font-size:12px">4</span></a>
+</nav>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="padding:0 10px 6px;font-size:12px;color:#a3a3a3">Recentes</div>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Front-end avançado</a>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Ciência da Computação</a>
+<a class="nav" href="Roadmap.dc.html" style="padding:6px 10px;border-radius:6px;color:#a3a3a3;font-size:13px">Mobile com Flutter</a>
+</div>
+</aside>
+
+<main style="flex:999 1 560px;min-width:0;box-sizing:border-box;padding:32px 40px;display:flex;flex-direction:column;gap:24px">
+
+<header style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px">
+<div>
+<div style="font-size:13px;color:#a3a3a3">24 tópicos</div>
+<h1 style="margin:4px 0 0;font-size:30px;font-weight:600;letter-spacing:-0.02em">Tópicos</h1>
+</div>
+<button class="btn1" style="padding:9px 16px;border:1px solid #fff;border-radius:6px;background:#fff;color:#000;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Novo tópico</button>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<label style="flex:1 1 260px;max-width:360px">
+<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Buscar tópicos</span>
+<input type="text" placeholder="Buscar tópicos" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #262626;border-radius:6px;background:#000;color:#fff;font-family:inherit;font-size:13px">
+</label>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<button style="padding:6px 12px;border:1px solid #525252;border-radius:6px;background:#171717;color:#fff;font-family:inherit;font-size:13px;cursor:pointer">Todos</button>
+<button class="btn2" style="padding:6px 12px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer">Estudando</button>
+<button class="btn2" style="padding:6px 12px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer">Não iniciado</button>
+<button class="btn2" style="padding:6px 12px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer">Concluído</button>
+</div>
+<button class="btn2" style="margin-left:auto;padding:6px 12px;border:1px solid #262626;border-radius:6px;background:transparent;color:#a3a3a3;font-family:inherit;font-size:13px;cursor:pointer">Atualizados recentemente</button>
+</div>
+
+<section style="border:1px solid #262626;border-radius:8px;overflow-x:auto">
+<div style="min-width:860px">
+<div style="display:grid;grid-template-columns:16px minmax(0,1fr) 180px 200px 100px 110px;gap:16px;align-items:center;padding:10px 16px;font-size:12px;color:#a3a3a3">
+<span></span><span>Tópico</span><span>Tags</span><span>Roadmap</span><span>Tempo</span><span style="text-align:right">Atualizado</span>
+</div>
+<sc-for list="{{topicos}}" as="t" hint-placeholder-count="10">
+<a class="row" href="Topico.dc.html" style="display:grid;grid-template-columns:16px minmax(0,1fr) 180px 200px 100px 110px;gap:16px;align-items:center;padding:14px 16px;border-top:1px solid #262626">
+<span style="{{t.dot}}"></span>
+<span style="font-weight:500">{{t.title}}</span>
+<span style="color:#a3a3a3;font-size:13px">{{t.tags}}</span>
+<span style="color:#a3a3a3;font-size:13px">{{t.roadmap}}</span>
+<span style="color:#a3a3a3;font-size:13px">{{t.time}}</span>
+<span style="color:#a3a3a3;font-size:13px;text-align:right">{{t.when}}</span>
+</a>
+</sc-for>
+</div>
+</section>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    const base = 'display:block;flex:0 0 auto;width:10px;height:10px;box-sizing:border-box;border-radius:50%;';
+    const dot = (s) => base + (s === 'done'
+      ? 'background:#fff;border:1.5px solid #fff'
+      : s === 'doing'
+        ? 'border:1.5px solid #fff;background:linear-gradient(90deg,#fff 50%,transparent 50%)'
+        : 'border:1.5px solid #8c8c8c');
+    const rows = [
+      ['Next.js App Router', 'react, nextjs', 'Front-end avançado', '4h 20min', 'hoje', 'doing'],
+      ['TypeScript avançado', 'typescript', 'Front-end avançado', '6h 05min', 'ontem', 'doing'],
+      ['Estruturas de dados', 'algoritmos', 'Ciência da Computação', '9h 10min', 'há 2 dias', 'doing'],
+      ['SQL e modelagem', 'banco de dados', 'Ciência da Computação', '3h 45min', 'há 3 dias', 'doing'],
+      ['Docker básico', 'devops', 'Sem roadmap', '1h 30min', 'há 5 dias', 'doing'],
+      ['Flutter widgets', 'mobile, flutter', 'Mobile com Flutter', '0 min', 'há 1 semana', 'none'],
+      ['Drupal theming', 'php, drupal', 'Sem roadmap', '5h 00min', 'há 1 semana', 'done'],
+      ['Inglês técnico', 'idiomas', 'Sem roadmap', '2h 15min', 'há 2 semanas', 'done'],
+      ['Git avançado', 'git', 'Front-end avançado', '2h 00min', 'há 2 semanas', 'done'],
+      ['Acessibilidade web', 'a11y, html', 'Front-end avançado', '3h 30min', 'há 3 semanas', 'done']
+    ];
+    const topicos = rows.map((r) => ({ title: r[0], tags: r[1], roadmap: r[2], time: r[3], when: r[4], dot: dot(r[5]) }));
+    return { topicos };
+  }
+}
+</script>
+
+
+</body></html>
