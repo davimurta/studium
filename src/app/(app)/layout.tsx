@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         recentRoadmaps={recentRoadmaps}
         logoutAction={logout}
       />
-      <main className="flex min-w-0 flex-1 flex-col gap-7 px-4 py-6 sm:px-10 sm:py-8">
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-10 sm:py-8">
         {children}
       </main>
     </div>

@@ -22,7 +22,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body>{children}</body>
+      {/* Extensoes do navegador alteram atributos do body antes da hidratacao. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

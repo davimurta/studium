@@ -10,11 +10,11 @@ export default async function RoadmapsPage() {
   const userId = await requireUserId();
   const count = await db.roadmap.count({ where: { userId } });
   return (
-    <>
+    <div className="flex flex-col gap-7">
       <PageHeader eyebrow={`${count} ${count === 1 ? "roadmap" : "roadmaps"}`} title="Roadmaps" />
       {count === 0 && (
         <EmptyState title="Nenhum roadmap ainda" description="Os roadmaps que você criar vão aparecer aqui." />
       )}
-    </>
+    </div>
   );
 }
