@@ -41,3 +41,63 @@ export function formatRelative(date: Date, now: Date = new Date()): string {
 export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function partsInZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return { y: get("year"), m: Number(get("month")), d: get("day"), hh: get("hour"), mm: get("minute") };
+}
+
+// "02 nov 2026"
+export function formatShortDate(date: Date): string {
+  const { y, m, d } = partsInZone(date, TIME_ZONE);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
+// "hoje às 18:20", "ontem às 09:05", "12 nov às 14:00"
+export function formatEditedAt(date: Date, now: Date = new Date()): string {
+  const { m, d, hh, mm } = partsInZone(date, TIME_ZONE);
+  const time = `${hh}:${mm}`;
+  const today = dayKey(now);
+  const yesterday = dayKey(new Date(now.getTime() - 86_400_000));
+  const key = dayKey(date);
+  if (key === today) return `hoje às ${time}`;
+  if (key === yesterday) return `ontem às ${time}`;
+  return `${d} ${MONTHS[m - 1]} às ${time}`;
+}
+
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+// Para datas de sessao (coluna @db.Date, gravada como meia-noite UTC do dia em Sao Paulo).
+// "Hoje", "Ontem", "Quinta" (ate 6 dias atras) ou "02 nov".
+export function formatSessionDay(date: Date, now: Date = new Date()): string {
+  const key = date.toISOString().slice(0, 10);
+  const today = dayKey(now);
+  const diff = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${key}T00:00:00Z`)) / 86_400_000);
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Ontem";
+  if (diff > 1 && diff < 7) return WEEKDAYS[date.getUTCDay()];
+  const [, mo, da] = key.split("-");
+  return `${da} ${MONTHS[Number(mo) - 1]}`;
+}
+
+// "nextjs.org/docs" a partir de "https://www.nextjs.org/docs/"
+export function displayUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = (u.pathname + u.search).replace(/\/$/, "");
+    return u.host.replace(/^www\./, "") + path;
+  } catch {
+    return url;
+  }
+}

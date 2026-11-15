@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { statusSchema, titleSchema, topicFormSchema } from "@/lib/validation/topic";
+import {
+  noteSchema,
+  resourceSchema,
+  statusSchema,
+  titleSchema,
+  topicFormSchema,
+} from "@/lib/validation/topic";
 
 export type TopicFormState =
   | { ok: true; id: string; at: number }
@@ -94,4 +100,63 @@ export async function deleteTopic(id: string): Promise<void> {
   await db.topic.deleteMany({ where: { id, userId } });
   refresh();
   redirect("/topicos");
+}
+
+/* Notas */
+
+export async function saveNote(
+  topicId: string,
+  content: string,
+): Promise<{ updatedAt?: string; error?: string }> {
+  const userId = await requireUserId();
+  const parsed = noteSchema.safeParse(content);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const topic = await db.topic.findFirst({ where: { id: topicId, userId }, select: { id: true } });
+  if (!topic) return { error: "Tópico não encontrado." };
+
+  const note = await db.note.upsert({
+    where: { topicId },
+    create: { topicId, content: parsed.data },
+    update: { content: parsed.data },
+    select: { updatedAt: true },
+  });
+  // Sem revalidatePath: o editor ja mostra o conteudo e evita re-render a cada tecla salva.
+  return { updatedAt: note.updatedAt.toISOString() };
+}
+
+/* Recursos */
+
+export type ResourceFormState =
+  | { ok: boolean; error?: string; at: number; values?: { title: string; url: string } }
+  | undefined;
+
+export async function addResource(
+  topicId: string,
+  _prev: ResourceFormState,
+  formData: FormData,
+): Promise<ResourceFormState> {
+  const userId = await requireUserId();
+  const topic = await db.topic.findFirst({ where: { id: topicId, userId }, select: { id: true } });
+  if (!topic) return { ok: false, error: "Tópico não encontrado.", at: Date.now() };
+
+  const values = { title: String(formData.get("title") ?? ""), url: String(formData.get("url") ?? "") };
+  const parsed = resourceSchema.safeParse(values);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message, at: Date.now(), values };
+
+  await db.resource.create({ data: { topicId, ...parsed.data } });
+  revalidatePath(`/topicos/${topicId}`);
+  return { ok: true, at: Date.now() };
+}
+
+export async function removeResource(resourceId: string): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const resource = await db.resource.findFirst({
+    where: { id: resourceId, topic: { userId } },
+    select: { topicId: true },
+  });
+  if (!resource) return { error: "Recurso não encontrado." };
+  await db.resource.delete({ where: { id: resourceId } });
+  revalidatePath(`/topicos/${resource.topicId}`);
+  return {};
 }

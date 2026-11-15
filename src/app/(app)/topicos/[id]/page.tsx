@@ -3,8 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusMenu } from "@/components/topics/status-menu";
 import { TopicActions } from "@/components/topics/topic-actions";
+import { TopicNotes } from "@/components/topics/topic-notes";
+import { TopicResources } from "@/components/topics/topic-resources";
 import { TopicTitle } from "@/components/topics/topic-title";
-import { getTopic } from "@/lib/data/topics";
+import { getTopic, getTopicExtras } from "@/lib/data/topics";
+import { formatMinutes, formatSessionDay, formatShortDate } from "@/lib/format";
+import { STATUS_LABEL } from "@/lib/status";
 import { requireUserId } from "@/lib/session";
 import { unarchiveTopic } from "../actions";
 
@@ -16,7 +20,8 @@ export async function generateMetadata({ params }: PageProps<"/topicos/[id]">): 
 
 export default async function TopicPage({ params }: PageProps<"/topicos/[id]">) {
   const userId = await requireUserId();
-  const topic = await getTopic(userId, (await params).id);
+  const { id } = await params;
+  const [topic, extras] = await Promise.all([getTopic(userId, id), getTopicExtras(userId, id)]);
   if (!topic) notFound();
 
   const roadmaps = [
@@ -84,6 +89,56 @@ export default async function TopicPage({ params }: PageProps<"/topicos/[id]">) 
           ))}
         </div>
       </header>
+
+      <div className="flex flex-wrap items-start gap-6">
+        <TopicNotes
+          key={topic.id}
+          topicId={topic.id}
+          initialContent={extras.note?.content ?? ""}
+          initialUpdatedAt={extras.note?.updatedAt.toISOString() ?? null}
+        />
+
+        <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-6">
+          <section className="overflow-hidden rounded-lg border border-line">
+            <h2 className="px-4 py-3.5 font-medium">Detalhes</h2>
+            <dl>
+              {(
+                [
+                  ["Status", STATUS_LABEL[topic.status]],
+                  ["Criado em", formatShortDate(topic.createdAt)],
+                  ["Tempo total", formatMinutes(extras.totalMinutes)],
+                  ["Sessões", String(extras.sessionCount)],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-4 border-t border-line px-4 py-[11px]">
+                  <dt className="text-fg-muted">{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <TopicResources topicId={topic.id} resources={extras.resources} />
+
+          <section className="overflow-hidden rounded-lg border border-line">
+            <h2 className="px-4 py-3.5 font-medium">Sessões recentes</h2>
+            {extras.recentSessions.length === 0 ? (
+              <p className="border-t border-line px-4 py-3 text-[13px] text-fg-muted">
+                Nenhuma sessão registrada ainda.
+              </p>
+            ) : (
+              <ul>
+                {extras.recentSessions.map((s) => (
+                  <li key={s.id} className="flex justify-between gap-4 border-t border-line px-4 py-[11px]">
+                    <span>{formatSessionDay(s.date)}</span>
+                    <span className="text-fg-muted">{formatMinutes(s.minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

@@ -36,3 +36,17 @@ export const topicFormSchema = z.object({
 });
 
 export type TopicFormInput = z.input<typeof topicFormSchema>;
+
+export const noteSchema = z.string().max(100_000, "A nota pode ter até 100 mil caracteres.");
+
+export const resourceSchema = z.object({
+  title: z.string().trim().min(1, "Informe um título.").max(120, "O título pode ter até 120 caracteres."),
+  url: z
+    .string()
+    .trim()
+    .max(2000, "URL muito longa.")
+    .transform((v) => (/^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`))
+    .pipe(
+      z.url({ protocol: /^https?$/, message: "Informe uma URL válida, começando com http ou https." }),
+    ),
+});
