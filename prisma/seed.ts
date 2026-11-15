@@ -128,7 +128,7 @@ export default async function Page() {
 - Como o cache do fetch se comporta em produção?
 `;
 
-type ItemSeed = { title: string; topic?: string; status?: Status };
+type ItemSeed = { title: string; topic?: string; status?: Status; children?: ItemSeed[] };
 
 type RoadmapSeed = {
   title: string;
@@ -150,16 +150,43 @@ const ROADMAPS: RoadmapSeed[] = [
     description: "Da base moderna de HTML e CSS até performance, design systems e deploy.",
     updatedDaysAgo: 0,
     items: [
-      { title: "HTML e CSS modernos", status: "DONE" },
-      { title: "JavaScript moderno", status: "DONE" },
+      {
+        title: "HTML e CSS modernos",
+        status: "DONE",
+        children: [
+          { title: "HTML semântico", status: "DONE" },
+          { title: "Flexbox e Grid", status: "DONE" },
+          { title: "Responsividade", status: "DONE" },
+        ],
+      },
+      {
+        title: "JavaScript moderno",
+        status: "DONE",
+        children: [
+          { title: "Módulos ES", status: "DONE" },
+          { title: "Async e await", status: "DONE" },
+          { title: "Fetch API", status: "DONE" },
+        ],
+      },
       { title: "Git avançado", topic: "Git avançado" },
       { title: "Fundamentos de React", status: "DONE" },
       { title: "Gerenciamento de estado", status: "DONE" },
       { title: "Testes com Vitest", status: "DONE" },
       { title: "Acessibilidade web", topic: "Acessibilidade web" },
       { title: "TypeScript avançado", topic: "TypeScript avançado" },
-      { title: "Next.js App Router", topic: "Next.js App Router" },
-      { title: "Performance web" },
+      {
+        title: "Next.js App Router",
+        topic: "Next.js App Router",
+        children: [
+          { title: "Server Components", status: "DONE" },
+          { title: "Server Actions", status: "STUDYING" },
+          { title: "Cache e revalidação" },
+        ],
+      },
+      {
+        title: "Performance web",
+        children: [{ title: "Core Web Vitals" }, { title: "Imagens e fontes" }, { title: "Bundle splitting" }],
+      },
       { title: "Design systems" },
       { title: "Deploy e CI/CD" },
     ],
@@ -247,21 +274,29 @@ async function main() {
   });
 
   for (const r of ROADMAPS) {
-    await db.roadmap.create({
-      data: {
-        userId: user.id,
-        title: r.title,
-        description: r.description,
-        items: {
-          create: r.items.map((item, position) => ({
-            title: item.title,
-            position,
-            topicId: item.topic ? topicIds.get(item.topic) : undefined,
-            status: item.status ?? "NOT_STARTED",
-          })),
-        },
-      },
+    const roadmap = await db.roadmap.create({
+      data: { userId: user.id, title: r.title, description: r.description },
     });
+    for (const [position, item] of r.items.entries()) {
+      await db.roadmapItem.create({
+        data: {
+          roadmapId: roadmap.id,
+          title: item.title,
+          position,
+          topicId: item.topic ? topicIds.get(item.topic) : undefined,
+          status: item.status ?? "NOT_STARTED",
+          children: {
+            create: (item.children ?? []).map((child, childPosition) => ({
+              roadmapId: roadmap.id,
+              title: child.title,
+              position: childPosition,
+              topicId: child.topic ? topicIds.get(child.topic) : undefined,
+              status: child.status ?? "NOT_STARTED",
+            })),
+          },
+        },
+      });
+    }
   }
 
   // @updatedAt e sempre "agora" na criacao; ajusta para refletir o prototipo.

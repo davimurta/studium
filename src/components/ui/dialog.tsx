@@ -21,15 +21,29 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
   );
 }
 
+// Ao abrir, foca o primeiro campo do formulario (e nao o primeiro botao).
+function focusFirstField(event: Event) {
+  const root = event.currentTarget as HTMLElement | null;
+  const field = root?.querySelector<HTMLElement>(
+    "input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled])",
+  );
+  if (field) {
+    event.preventDefault();
+    field.focus();
+  }
+}
+
 function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        onOpenAutoFocus={onOpenAutoFocus ?? focusFirstField}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[440px] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-y-auto rounded-lg border border-line bg-black p-6 text-fg outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
           className,
