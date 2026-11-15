@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import type { RoadmapItemRow, TopicOption } from "@/lib/data/roadmaps";
+import type { RoadmapItemRow, RoadmapStep, TopicOption } from "@/lib/data/roadmaps";
 import { STATUS_LABEL } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
@@ -24,26 +24,53 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   roadmapId: string;
   topics: TopicOption[];
+  steps: RoadmapStep[];
   /** Sem item: adicionar etapa. Com item: editar. */
   item?: RoadmapItemRow;
+  itemHasChildren?: boolean;
+  /** Ao adicionar: etapa principal onde a subetapa entra (null = etapa principal). */
+  parentId?: string | null;
 };
 
-export function ItemDialog({ open, onOpenChange, roadmapId, topics, item }: Props) {
+export function ItemDialog({
+  open,
+  onOpenChange,
+  roadmapId,
+  topics,
+  steps,
+  item,
+  itemHasChildren = false,
+  parentId = null,
+}: Props) {
+  const parent = parentId ? steps.find((s) => s.id === parentId) : undefined;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{item ? "Editar etapa" : "Adicionar etapa"}</DialogTitle>
+          <DialogTitle>{item ? "Editar etapa" : parent ? "Adicionar subetapa" : "Adicionar etapa"}</DialogTitle>
           <DialogDescription>
             {item
               ? "Etapas ligadas a um tópico usam o status do tópico."
-              : "Escreva uma etapa livre ou ligue um tópico que você já tem."}
+              : parent
+                ? `Dentro de "${parent.title}". Escreva uma subetapa livre ou ligue um tópico.`
+                : "Escreva uma etapa livre ou ligue um tópico que você já tem."}
           </DialogDescription>
         </DialogHeader>
         {item ? (
-          <EditItemForm item={item} topics={topics} onDone={() => onOpenChange(false)} />
+          <EditItemForm
+            item={item}
+            topics={topics}
+            steps={steps}
+            hasChildren={itemHasChildren}
+            onDone={() => onOpenChange(false)}
+          />
         ) : (
-          <AddItemForm roadmapId={roadmapId} topics={topics} onDone={() => onOpenChange(false)} />
+          <AddItemForm
+            roadmapId={roadmapId}
+            topics={topics}
+            parentId={parentId}
+            onDone={() => onOpenChange(false)}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -78,10 +105,12 @@ function useCloseOnSuccess(state: FormState, onDone: () => void) {
 function AddItemForm({
   roadmapId,
   topics,
+  parentId,
   onDone,
 }: {
   roadmapId: string;
   topics: TopicOption[];
+  parentId: string | null;
   onDone: () => void;
 }) {
   const [mode, setMode] = useState<"livre" | "topico">("livre");
@@ -94,6 +123,7 @@ function AddItemForm({
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="mode" value={mode} />
+      <input type="hidden" name="parentId" value={parentId ?? ""} />
       <div role="group" aria-label="Tipo de etapa" className="grid grid-cols-2 gap-1 rounded-md border border-line p-1">
         {(
           [
@@ -164,7 +194,7 @@ function AddItemForm({
           </Button>
         </DialogClose>
         <Button type="submit" disabled={pending || (mode === "topico" && topics.length === 0)}>
-          {pending ? "Adicionando..." : "Adicionar etapa"}
+          {pending ? "Adicionando..." : parentId ? "Adicionar subetapa" : "Adicionar etapa"}
         </Button>
       </DialogFooter>
     </form>
@@ -174,12 +204,17 @@ function AddItemForm({
 function EditItemForm({
   item,
   topics,
+  steps,
+  hasChildren,
   onDone,
 }: {
   item: RoadmapItemRow;
   topics: TopicOption[];
+  steps: RoadmapStep[];
+  hasChildren: boolean;
   onDone: () => void;
 }) {
+  const parentOptions = steps.filter((s) => s.id !== item.id);
   const [topicId, setTopicId] = useState(item.topic?.id ?? "");
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     updateItem.bind(null, item.id),
@@ -201,6 +236,30 @@ function EditItemForm({
           Título da etapa
         </label>
         <Input id="edit-item-title" name="title" required maxLength={160} defaultValue={item.title} autoFocus />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="edit-item-parent" className={labelClass}>
+          Posição no mapa
+        </label>
+        <Select
+          id="edit-item-parent"
+          name="parentId"
+          defaultValue={item.parentId ?? ""}
+          disabled={hasChildren}
+          aria-describedby={hasChildren ? "edit-item-parent-hint" : undefined}
+        >
+          <option value="">Etapa principal</option>
+          {parentOptions.map((s) => (
+            <option key={s.id} value={s.id}>
+              Subetapa de: {s.title}
+            </option>
+          ))}
+        </Select>
+        {hasChildren && (
+          <p id="edit-item-parent-hint" className="text-xs text-fg-muted">
+            Etapas com subetapas ficam sempre como etapa principal.
+          </p>
+        )}
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="edit-item-topic" className={labelClass}>

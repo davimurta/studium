@@ -33,7 +33,7 @@ async function touchRoadmap(id: string) {
 async function findOwnedItem(userId: string, itemId: string) {
   return db.roadmapItem.findFirst({
     where: { id: itemId, roadmap: { userId } },
-    select: { id: true, roadmapId: true, topicId: true, status: true, topic: { select: { status: true } } },
+    select: { id: true, roadmapId: true, parentId: true, topicId: true },
   });
 }
 
@@ -80,6 +80,40 @@ export async function deleteRoadmap(id: string): Promise<void> {
 
 /* Etapas */
 
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+// Regrava posicoes 0..n-1 dos irmaos (mesmo roadmap e mesmo parentId).
+async function compactSiblings(tx: Tx, roadmapId: string, parentId: string | null) {
+  const siblings = await tx.roadmapItem.findMany({
+    where: { roadmapId, parentId },
+    orderBy: { position: "asc" },
+    select: { id: true, position: true },
+  });
+  for (const [index, s] of siblings.entries()) {
+    if (s.position !== index) await tx.roadmapItem.update({ where: { id: s.id }, data: { position: index } });
+  }
+}
+
+async function nextPosition(roadmapId: string, parentId: string | null) {
+  const last = await db.roadmapItem.aggregate({ where: { roadmapId, parentId }, _max: { position: true } });
+  return (last._max.position ?? -1) + 1;
+}
+
+// Pai valido: etapa principal (sem pai) do mesmo roadmap.
+async function validParent(roadmapId: string, parentId: string | null) {
+  if (!parentId) return true;
+  const parent = await db.roadmapItem.findFirst({
+    where: { id: parentId, roadmapId, parentId: null },
+    select: { id: true },
+  });
+  return Boolean(parent);
+}
+
+function readParentId(formData: FormData): string | null {
+  const value = formData.get("parentId");
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
 export async function addItem(roadmapId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const userId = await requireUserId();
   const roadmap = await db.roadmap.findFirst({ where: { id: roadmapId, userId }, select: { id: true } });
@@ -93,18 +127,19 @@ export async function addItem(roadmapId: string, _prev: FormState, formData: For
   });
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
-  const last = await db.roadmapItem.aggregate({ where: { roadmapId }, _max: { position: true } });
-  const position = (last._max.position ?? -1) + 1;
+  const parentId = readParentId(formData);
+  if (!(await validParent(roadmapId, parentId))) return fail("Etapa principal não encontrada.");
+  const position = await nextPosition(roadmapId, parentId);
 
   if (parsed.data.mode === "topico") {
     const topic = await ownsTopic(userId, parsed.data.topicId);
     if (!topic) return fail("Tópico não encontrado.");
     await db.roadmapItem.create({
-      data: { roadmapId, topicId: topic.id, title: topic.title, position },
+      data: { roadmapId, parentId, topicId: topic.id, title: topic.title, position },
     });
   } else {
     await db.roadmapItem.create({
-      data: { roadmapId, title: parsed.data.title, status: parsed.data.status, position },
+      data: { roadmapId, parentId, title: parsed.data.title, status: parsed.data.status, position },
     });
   }
 
@@ -115,7 +150,10 @@ export async function addItem(roadmapId: string, _prev: FormState, formData: For
 
 export async function updateItem(itemId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const userId = await requireUserId();
-  const item = await findOwnedItem(userId, itemId);
+  const item = await db.roadmapItem.findFirst({
+    where: { id: itemId, roadmap: { userId } },
+    select: { id: true, roadmapId: true, parentId: true, status: true, _count: { select: { children: true } } },
+  });
   if (!item) return fail("Etapa não encontrada.");
 
   const parsed = editItemSchema.safeParse({
@@ -128,12 +166,32 @@ export async function updateItem(itemId: string, _prev: FormState, formData: For
   const { title, topicId } = parsed.data;
   if (topicId && !(await ownsTopic(userId, topicId))) return fail("Tópico não encontrado.");
 
+  // Campo ausente no form = manter o pai atual.
+  const parentId = formData.has("parentId") ? readParentId(formData) : item.parentId;
+  if (parentId === item.id) return fail("Uma etapa não pode ficar dentro dela mesma.");
+  if (parentId && item._count.children > 0) {
+    return fail("Esta etapa tem subetapas. Mova ou remova as subetapas antes.");
+  }
+  if (!(await validParent(item.roadmapId, parentId))) return fail("Etapa principal não encontrada.");
+
   // Com topico, o status vem dele e o da etapa nao muda. Sem topico, vale o escolhido no form
   // (o form ja sugere o status do topico ao desvincular).
   const status = topicId ? item.status : parsed.data.status;
+  const moved = parentId !== item.parentId;
 
-  await db.roadmapItem.update({ where: { id: itemId }, data: { title, topicId, status } });
-  await touchRoadmap(item.roadmapId);
+  await db.$transaction(async (tx) => {
+    await tx.roadmapItem.update({
+      where: { id: itemId },
+      data: {
+        title,
+        topicId,
+        status,
+        ...(moved ? { parentId, position: await nextPosition(item.roadmapId, parentId) } : {}),
+      },
+    });
+    if (moved) await compactSiblings(tx, item.roadmapId, item.parentId);
+    await tx.roadmap.update({ where: { id: item.roadmapId }, data: { updatedAt: new Date() } });
+  });
   refresh();
   return done();
 }
@@ -143,16 +201,10 @@ export async function removeItem(itemId: string): Promise<{ error?: string }> {
   const item = await findOwnedItem(userId, itemId);
   if (!item) return { error: "Etapa não encontrada." };
 
+  // Subetapas saem junto (onDelete: Cascade).
   await db.$transaction(async (tx) => {
     await tx.roadmapItem.delete({ where: { id: itemId } });
-    const rest = await tx.roadmapItem.findMany({
-      where: { roadmapId: item.roadmapId },
-      orderBy: { position: "asc" },
-      select: { id: true, position: true },
-    });
-    for (const [index, r] of rest.entries()) {
-      if (r.position !== index) await tx.roadmapItem.update({ where: { id: r.id }, data: { position: index } });
-    }
+    await compactSiblings(tx, item.roadmapId, item.parentId);
     await tx.roadmap.update({ where: { id: item.roadmapId }, data: { updatedAt: new Date() } });
   });
   refresh();
@@ -177,15 +229,19 @@ export async function setItemStatus(itemId: string, status: string): Promise<{ e
   return {};
 }
 
-// Recebe a nova ordem completa e grava as posicoes alteradas em uma transacao.
-export async function reorderItems(roadmapId: string, orderedIds: string[]): Promise<{ error?: string }> {
+// Recebe a nova ordem completa de um grupo de irmaos e grava as posicoes em uma transacao.
+export async function reorderItems(
+  roadmapId: string,
+  parentId: string | null,
+  orderedIds: string[],
+): Promise<{ error?: string }> {
   const userId = await requireUserId();
   const parsed = reorderSchema.safeParse(orderedIds);
   if (!parsed.success) return { error: "Ordem inválida." };
 
   const roadmap = await db.roadmap.findFirst({
     where: { id: roadmapId, userId },
-    select: { items: { select: { id: true, position: true } } },
+    select: { items: { where: { parentId }, select: { id: true, position: true } } },
   });
   if (!roadmap) return { error: "Roadmap não encontrado." };
 
@@ -200,9 +256,7 @@ export async function reorderItems(roadmapId: string, orderedIds: string[]): Pro
     .filter(({ id, position }) => current.get(id) !== position);
 
   await db.$transaction([
-    ...changed.map(({ id, position }) =>
-      db.roadmapItem.update({ where: { id }, data: { position } }),
-    ),
+    ...changed.map(({ id, position }) => db.roadmapItem.update({ where: { id }, data: { position } })),
     db.roadmap.update({ where: { id: roadmapId }, data: { updatedAt: new Date() } }),
   ]);
   refresh();

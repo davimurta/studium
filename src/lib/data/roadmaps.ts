@@ -34,6 +34,7 @@ export const getRoadmap = cache(async (userId: string, id: string) => {
         orderBy: { position: "asc" },
         select: {
           id: true,
+          parentId: true,
           title: true,
           position: true,
           status: true,
@@ -43,12 +44,25 @@ export const getRoadmap = cache(async (userId: string, id: string) => {
     },
   });
   if (!roadmap) return null;
-  const items = roadmap.items.map((item) => ({ ...item, effectiveStatus: effectiveStatus(item) }));
-  return { ...roadmap, items, ...progress(roadmap.items) };
+
+  const rows = roadmap.items.map((item) => ({ ...item, effectiveStatus: effectiveStatus(item) }));
+  // Arvore de um nivel: etapas principais com suas subetapas, cada grupo em ordem de position.
+  const steps = rows
+    .filter((r) => r.parentId === null)
+    .map((step) => ({ ...step, children: rows.filter((r) => r.parentId === step.id) }));
+
+  return {
+    id: roadmap.id,
+    title: roadmap.title,
+    description: roadmap.description,
+    steps,
+    ...progress(roadmap.items),
+  };
 });
 
 export type RoadmapDetail = NonNullable<Awaited<ReturnType<typeof getRoadmap>>>;
-export type RoadmapItemRow = RoadmapDetail["items"][number];
+export type RoadmapStep = RoadmapDetail["steps"][number];
+export type RoadmapItemRow = Omit<RoadmapStep, "children">;
 
 // Topicos disponiveis para vincular a etapas.
 export async function listTopicOptions(userId: string) {

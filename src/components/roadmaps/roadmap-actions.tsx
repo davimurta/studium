@@ -22,17 +22,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { TopicOption } from "@/lib/data/roadmaps";
-import { ItemDialog } from "./item-dialog";
+import { useRoadmapEditor } from "./roadmap-editor";
 import { RoadmapFormDialog } from "./roadmap-form-dialog";
 
 type Props = {
   roadmap: { id: string; title: string; description: string | null };
-  topics: TopicOption[];
 };
 
-export function RoadmapActions({ roadmap, topics }: Props) {
-  const [adding, setAdding] = useState(false);
+export function RoadmapActions({ roadmap }: Props) {
+  const editor = useRoadmapEditor();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -46,7 +44,7 @@ export function RoadmapActions({ roadmap, topics }: Props) {
           </AnimatedButton>
         }
       />
-      <AnimatedButton icon={PlusIcon} iconSize={14} onClick={() => setAdding(true)}>
+      <AnimatedButton icon={PlusIcon} iconSize={14} onClick={() => editor.openAdd(null)}>
         Adicionar etapa
       </AnimatedButton>
       <DropdownMenu>
@@ -59,14 +57,6 @@ export function RoadmapActions({ roadmap, topics }: Props) {
           <DropdownMenuItem onSelect={() => setConfirmOpen(true)}>Excluir roadmap</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <ItemDialog
-        key={adding ? "open" : "closed"}
-        open={adding}
-        onOpenChange={setAdding}
-        roadmapId={roadmap.id}
-        topics={topics}
-      />
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>

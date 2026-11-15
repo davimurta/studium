@@ -74,16 +74,22 @@ model Roadmap {
 }
 
 model RoadmapItem {
-  id        String  @id @default(cuid())
+  id        String        @id @default(cuid())
   roadmapId String
-  roadmap   Roadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  roadmap   Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  // Subetapa aponta para a etapa principal (um nivel so). Etapa principal tem parentId nulo.
+  parentId  String?
+  parent    RoadmapItem?  @relation("ItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  RoadmapItem[] @relation("ItemChildren")
   topicId   String?
-  topic     Topic?  @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  topic     Topic?        @relation(fields: [topicId], references: [id], onDelete: SetNull)
   title     String
+  // Posicao entre irmaos (mesmo parentId).
   position  Int
-  status    Status  @default(NOT_STARTED)
+  status    Status        @default(NOT_STARTED)
 
   @@index([roadmapId, position])
+  @@index([parentId, position])
 }
 
 model StudyLog {
