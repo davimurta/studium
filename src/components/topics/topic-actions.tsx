@@ -19,20 +19,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LogStudyDialog, type StudyTopicOption } from "@/components/study/log-study-dialog";
 import { TopicFormDialog, type TopicFormValues } from "./topic-form-dialog";
 
-type Props = { topic: TopicFormValues; archived: boolean };
+type Props = {
+  topic: TopicFormValues;
+  archived: boolean;
+  studyTopics: StudyTopicOption[];
+  today: string;
+};
 
-export function TopicActions({ topic, archived }: Props) {
+export function TopicActions({ topic, archived, studyTopics, today }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   return (
     <div className="flex gap-2">
       <TopicFormDialog topic={topic} trigger={<Button variant="secondary">Editar</Button>} />
-      <Button disabled>
-        Registrar estudo
-      </Button>
+      <LogStudyDialog
+        trigger={<Button>Registrar estudo</Button>}
+        topics={studyTopics}
+        defaultTopicId={topic.id}
+        today={today}
+      />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="h-auto self-stretch" aria-label="Mais ações">

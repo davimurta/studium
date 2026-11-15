@@ -6,7 +6,9 @@ import { TopicActions } from "@/components/topics/topic-actions";
 import { TopicNotes } from "@/components/topics/topic-notes";
 import { TopicResources } from "@/components/topics/topic-resources";
 import { TopicTitle } from "@/components/topics/topic-title";
+import { listTopicOptions } from "@/lib/data/roadmaps";
 import { getTopic, getTopicExtras } from "@/lib/data/topics";
+import { todayKey } from "@/lib/study-days";
 import { formatMinutes, formatSessionDay, formatShortDate } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/status";
 import { requireUserId } from "@/lib/session";
@@ -21,7 +23,11 @@ export async function generateMetadata({ params }: PageProps<"/topicos/[id]">): 
 export default async function TopicPage({ params }: PageProps<"/topicos/[id]">) {
   const userId = await requireUserId();
   const { id } = await params;
-  const [topic, extras] = await Promise.all([getTopic(userId, id), getTopicExtras(userId, id)]);
+  const [topic, extras, topicOptions] = await Promise.all([
+    getTopic(userId, id),
+    getTopicExtras(userId, id),
+    listTopicOptions(userId),
+  ]);
   if (!topic) notFound();
 
   const roadmaps = [
@@ -54,6 +60,13 @@ export default async function TopicPage({ params }: PageProps<"/topicos/[id]">) 
           <TopicTitle key={topic.title} id={topic.id} title={topic.title} />
           <TopicActions
             archived={archived}
+            today={todayKey()}
+            studyTopics={
+              // Topico arquivado tambem aceita registro a partir da propria pagina.
+              topicOptions.some((t) => t.id === topic.id)
+                ? topicOptions
+                : [{ id: topic.id, title: topic.title, status: topic.status }, ...topicOptions]
+            }
             topic={{
               id: topic.id,
               title: topic.title,

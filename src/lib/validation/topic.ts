@@ -50,3 +50,13 @@ export const resourceSchema = z.object({
       z.url({ protocol: /^https?$/, message: "Informe uma URL válida, começando com http ou https." }),
     ),
 });
+
+export const studyLogSchema = z.object({
+  topicId: z.string().min(1, "Escolha um tópico."),
+  minutes: z.coerce
+    .number({ message: "Informe os minutos." })
+    .int("Use minutos inteiros.")
+    .min(1, "Registre pelo menos 1 minuto.")
+    .max(1440, "Uma sessão pode ter até 1440 minutos (24 horas)."),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida."),
+});
