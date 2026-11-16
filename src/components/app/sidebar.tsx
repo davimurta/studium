@@ -16,6 +16,7 @@ const NAV = [
   { href: "/", label: "Dashboard", match: (p: string) => p === "/" },
   { href: "/topicos", label: "Tópicos", match: (p: string) => p.startsWith("/topicos") },
   { href: "/roadmaps", label: "Roadmaps", match: (p: string) => p.startsWith("/roadmaps") },
+  { href: "/linguas", label: "Línguas", match: (p: string) => p.startsWith("/linguas") },
 ] as const;
 
 export function Sidebar({ topicCount, roadmapCount, recentRoadmaps, logoutAction }: Props) {

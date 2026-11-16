@@ -13,6 +13,7 @@ import { SlashCommand } from "./slash-command";
 
 type Props = {
   initialMarkdown: string;
+  label?: string;
   onChange: (markdown: string) => void;
   onBlur: () => void;
 };
@@ -23,7 +24,7 @@ type Props = {
   ``` codigo, > citacao) e "/" abre o menu de blocos. O conteudo continua salvo
   como markdown.
 */
-export function NoteEditor({ initialMarkdown, onChange, onBlur }: Props) {
+export function NoteEditor({ initialMarkdown, label = "Notas do tópico", onChange, onBlur }: Props) {
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   useEffect(() => {
@@ -66,7 +67,7 @@ export function NoteEditor({ initialMarkdown, onChange, onBlur }: Props) {
     editorProps: {
       attributes: {
         class: "note-content min-h-[360px] outline-none",
-        "aria-label": "Notas do tópico",
+        "aria-label": label,
         "aria-multiline": "true",
         role: "textbox",
       },

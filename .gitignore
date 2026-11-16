@@ -45,3 +45,6 @@ next-env.d.ts
 
 # prisma client gerado
 /src/generated
+
+# dados pessoais para popular a conta (nao versionar: repo publico)
+/.local
