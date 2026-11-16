@@ -12,7 +12,7 @@ import { todayKey } from "@/lib/study-days";
 import { formatMinutes, formatSessionDay, formatShortDate } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/status";
 import { requireUserId } from "@/lib/session";
-import { unarchiveTopic } from "../actions";
+import { saveNote, unarchiveTopic } from "../actions";
 
 export async function generateMetadata({ params }: PageProps<"/topicos/[id]">): Promise<Metadata> {
   const userId = await requireUserId();
@@ -106,7 +106,7 @@ export default async function TopicPage({ params }: PageProps<"/topicos/[id]">) 
       <div className="flex flex-wrap items-start gap-6">
         <TopicNotes
           key={topic.id}
-          topicId={topic.id}
+          save={saveNote.bind(null, topic.id)}
           initialContent={extras.note?.content ?? ""}
           initialUpdatedAt={extras.note?.updatedAt.toISOString() ?? null}
         />
