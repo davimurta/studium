@@ -14,14 +14,18 @@ enum Status {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String?
-  passwordHash String
-  createdAt    DateTime   @default(now())
-  topics       Topic[]
-  roadmaps     Roadmap[]
-  studyLogs    StudyLog[]
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  topics        Topic[]
+  roadmaps      Roadmap[]
+  studyLogs     StudyLog[]
+  languages     Language[]
+  routineItems  RoutineItem[]
+  routineChecks RoutineCheck[]
+  languagePlan  LanguagePlan?
 }
 
 model Topic {
@@ -39,6 +43,7 @@ model Topic {
   resources    Resource[]
   studyLogs    StudyLog[]
   roadmapItems RoadmapItem[]
+  language     Language?
 
   @@index([userId, status])
 }
@@ -93,14 +98,99 @@ model RoadmapItem {
 }
 
 model StudyLog {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId   String
-  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  minutes   Int
-  date      DateTime @db.Date
-  createdAt DateTime @default(now())
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId      String
+  topic        Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  minutes      Int
+  date         DateTime      @db.Date
+  createdAt    DateTime      @default(now())
+  routineCheck RoutineCheck?
 
   @@index([userId, date])
+}
+
+/**
+ * Linguas: rotina diaria repetida, revisoes semanais e mensais.
+ */
+
+enum LanguageStatus {
+  ACTIVE
+  MAINTENANCE
+  PLANNED
+  NATIVE
+}
+
+enum RoutineFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Language {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  level       String         @default("")
+  goal        String         @default("")
+  status      LanguageStatus @default(PLANNED)
+  // Horas estimadas ate a proxima meta (referencia para a barra de horas).
+  targetHours Int?
+  position    Int
+  // Topico onde ficam notas, recursos e as sessoes de estudo da lingua.
+  topicId     String?        @unique
+  topic       Topic?         @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  routine     RoutineItem[]
+
+  @@index([userId, position])
+}
+
+model RoutineItem {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languageId String?
+  language   Language?        @relation(fields: [languageId], references: [id], onDelete: SetNull)
+  title      String
+  details    String?
+  frequency  RoutineFrequency @default(DAILY)
+  // Dias da semana (0 = domingo ... 6 = sabado). Vazio = todos os dias. So vale para DAILY.
+  weekdays   Int[]
+  minutes    Int              @default(0)
+  position   Int
+  archivedAt DateTime?
+  createdAt  DateTime         @default(now())
+  checks     RoutineCheck[]
+
+  @@index([userId, frequency, position])
+}
+
+model RoutineCheck {
+  id         String      @id @default(cuid())
+  itemId     String
+  item       RoutineItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Dia (DAILY), segunda-feira da semana (WEEKLY) ou dia 1 do mes (MONTHLY).
+  period     DateTime    @db.Date
+  minutes    Int         @default(0)
+  // Sessao de estudo criada ao marcar o item (some junto ao desmarcar).
+  studyLogId String?     @unique
+  studyLog   StudyLog?   @relation(fields: [studyLogId], references: [id], onDelete: SetNull)
+  createdAt  DateTime    @default(now())
+
+  @@unique([itemId, period])
+  @@index([userId, period])
+}
+
+model LanguagePlan {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @default("")
+  updatedAt DateTime @updatedAt
 }

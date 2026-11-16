@@ -1,18 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { saveNote } from "@/app/(app)/topicos/actions";
 import { formatEditedAt } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { NoteEditor } from "./note-editor/note-editor";
 
-type Props = { topicId: string; initialContent: string; initialUpdatedAt: string | null };
+type SaveResult = { updatedAt?: string; error?: string };
+
+type Props = {
+  /** Server action que grava o markdown (nota do topico, plano de linguas). */
+  save: (content: string) => Promise<SaveResult>;
+  initialContent: string;
+  initialUpdatedAt: string | null;
+  title?: string;
+  /** Rotulo do editor para leitores de tela. */
+  editorLabel?: string;
+};
 
 type SaveState = "idle" | "dirty" | "saving" | "error";
 
 const DEBOUNCE_MS = 800;
 
-export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props) {
+export function TopicNotes({
+  save,
+  initialContent,
+  initialUpdatedAt,
+  title = "Notas",
+  editorLabel = "Notas do tópico",
+}: Props) {
   const [content, setContent] = useState(initialContent);
   // Visual: editor estilo Notion. Markdown: texto cru, para quem prefere.
   const [mode, setMode] = useState<"visual" | "markdown">("visual");
@@ -39,7 +54,7 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
     }
     const id = ++seq.current;
     setState("saving");
-    const result = await saveNote(topicId, text);
+    const result = await save(text);
     if (id !== seq.current) return; // resposta antiga, outra gravacao ja comecou
     if (result.error) {
       setError(result.error);
@@ -65,9 +80,9 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
     const latestRef = latest;
     const savedRef = saved;
     return () => {
-      if (latestRef.current !== savedRef.current) void saveNote(topicId, latestRef.current);
+      if (latestRef.current !== savedRef.current) void save(latestRef.current);
     };
-  }, [topicId]);
+  }, [save]);
 
   // Avisa antes de fechar a aba com alteracao ainda nao salva.
   useEffect(() => {
@@ -92,7 +107,7 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
   return (
     <section className="min-w-0 flex-[3_1_480px] rounded-lg border border-line transition-colors focus-within:border-line-hover">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-        <h2 className="font-medium">Notas</h2>
+        <h2 className="font-medium">{title}</h2>
         <div className="flex items-center gap-3">
           <span aria-live="polite" className="text-[13px] text-fg-muted">
             {statusText}
@@ -141,6 +156,7 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
             <NoteEditor
               key={editorKey}
               initialMarkdown={content}
+              label={editorLabel}
               onChange={onChange}
               onBlur={() => void flush()}
             />
@@ -153,7 +169,7 @@ export function TopicNotes({ topicId, initialContent, initialUpdatedAt }: Props)
       ) : (
         <div className="p-5">
           <label htmlFor="topic-note" className="sr-only">
-            Notas do tópico em markdown
+            {editorLabel} em markdown
           </label>
           <textarea
             id="topic-note"
