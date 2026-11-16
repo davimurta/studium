@@ -22,7 +22,17 @@ function daysBetween(from: Date, to: Date): number {
 
 // "hoje", "ontem", "há 2 dias", "há 1 semana", "há 3 meses"
 export function formatRelative(date: Date, now: Date = new Date()): string {
-  const days = Math.max(0, daysBetween(date, now));
+  return formatRelativeDays(daysBetween(date, now));
+}
+
+// Igual a formatRelative, para chaves de dia "YYYY-MM-DD" (datas de sessao).
+export function formatRelativeKey(key: string, today: string): string {
+  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${key}T00:00:00Z`)) / 86_400_000);
+  return formatRelativeDays(days);
+}
+
+function formatRelativeDays(input: number): string {
+  const days = Math.max(0, input);
   if (days === 0) return "hoje";
   if (days === 1) return "ontem";
   if (days < 7) return `há ${days} dias`;
